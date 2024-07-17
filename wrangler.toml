@@ -1,0 +1,17 @@
+name = "wtsync-server"
+main = "./src/index.ts"
+compatibility_date = "2024-06-03"
+
+
+[[d1_databases]]
+binding = "DB"
+database_name = "prod-wtsync"
+database_id = "2b159a51-7a64-4234-aff5-7e8a02a0bcaa"
+
+[[durable_objects.bindings]]
+name = "WEBSOCKET_HOST"
+class_name = "WebSocketHostObject"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["WebSocketHostObject"]
