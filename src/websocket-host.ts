@@ -6,14 +6,20 @@ import { beginPartyRequest, writeError } from "./utils";
 
 export class WebSocketHostObject extends DurableObject<Env> {
 
+	getConnectionCount() {
+		return this.ctx.getWebSockets().length;
+	}
+
 	sendUpdate(data: PlayerAndPluginFormatV1) {
-		const sockets = this.ctx.getWebSockets(data.id);
+		const sockets = this.ctx.getWebSockets(data.id),
+			payload = JSON.stringify({
+				msg: 'update',
+				data
+			});
+
 		if ( Array.isArray(sockets) )
 			for(const socket of sockets) {
-				socket.send(JSON.stringify({
-					msg: 'update',
-					data
-				}));
+				socket.send(payload);
 			}
 	}
 
@@ -41,6 +47,16 @@ export class WebSocketHostObject extends DurableObject<Env> {
 			ids
 		);
 
+		const connections = this.ctx.getWebSockets().length;
+
+		this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(
+			'{"msg":"get_status"}',
+			JSON.stringify({
+				msg: 'status',
+				connections
+			})
+		));
+
 		// Send the initial data.
 		server.send(JSON.stringify({msg: 'initial', results}));
 
@@ -55,7 +71,15 @@ export class WebSocketHostObject extends DurableObject<Env> {
 	}
 
 	webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): void | Promise<void> {
-		// do nothing
+		const connections = this.ctx.getWebSockets().length - 1;
+
+		this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(
+			'{"msg":"get_status"}',
+			JSON.stringify({
+				msg: 'status',
+				connections
+			})
+		));
 	}
 
 }

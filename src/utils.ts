@@ -1,14 +1,15 @@
 import { DBFormatV1, Env, PlayerAndPluginFormatV1, PluginFormatV1 } from './types';
 
-export function pluginToDatabase(player: string, input: PluginFormatV1): DBFormatV1 {
+export function pluginToDatabase(player: string, input: PluginFormatV1): DBFormatV1 | null {
 
 	if (typeof input.expires !== 'string' || ! input.expires.length )
 		throw new Error('invalid expires');
 
 	const when = new Date(input.expires).getTime();
 
+	// If the book has expired, return null.
 	if (when < Date.now())
-		throw new Error('expired book');
+		return null;
 
 	let stickers = parseInt(input.stickers, 10);
 	if (Number.isNaN(stickers) || stickers < 0 || stickers > 9)
@@ -72,6 +73,8 @@ export function writeJSON(obj: any, status = 200, headers?: Record<string, strin
 
 	if ( !headers['Content-Type'])
 		headers['Content-Type'] = 'application/json;charset=utf-8';
+
+	headers['Access-Control-Allow-Origin'] = '*';
 
 	return new Response(JSON.stringify(obj), {
 		status,

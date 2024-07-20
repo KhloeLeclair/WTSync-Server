@@ -1,5 +1,5 @@
 import { DBFormatV1, Env, PlayerAndPluginFormatV1 } from "./types";
-import { beginPartyRequest, databaseToPlugin, pluginToDatabase, writeError, writeSuccess } from "./utils";
+import { beginPartyRequest, databaseToPlugin, pluginToDatabase, writeError, writeJSON, writeSuccess } from "./utils";
 
 
 export function fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
@@ -12,11 +12,26 @@ export function fetch(request: Request, env: Env, ctx: ExecutionContext): Respon
 	else if (url.pathname.startsWith('/party/'))
 		return handleParty(request, env, ctx);
 
+	else if (url.pathname.startsWith('/status'))
+		return handleStatus(request, env, ctx);
+
 	else if (url.pathname === '/')
 		return writeSuccess('Hello world.');
 
 	return writeError(404, 'Not Found');
 
+}
+
+
+export async function handleStatus(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	const id = env.WEBSOCKET_HOST.idFromName('main'),
+		stub = env.WEBSOCKET_HOST.get(id);
+
+	const connections = stub ? (await stub.getConnectionCount()) : 0;
+
+	return writeSuccess('Hello.', {
+		connections
+	});
 }
 
 
@@ -40,7 +55,32 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 		return writeError(400, `Invalid input: ${err}`);
 	}
 
-	// 2. Database interaction.
+
+	// 2. Check the existing database record to see if this really is an update
+	// or if the client is merely being safe and making extra requests.
+
+	// While this does cause an extra D1 hit, this potentially bypasses a
+	// call to the durable object so I consider it worth while.
+	const existing = await env.DB.prepare('SELECT * FROM Entries WHERE player_id = ?')
+		.bind(body.id)
+		.run(),
+
+		record = existing.success &&
+			(existing as any)?.results?.[0] as DBFormatV1 | null;
+
+	// Okay, we got a record, maybe. Does it match?
+	const is_match = (record == null && thing == null) || (
+		record != null && thing != null &&
+		record.player_id === thing.player_id &&
+		record.expires === thing.expires &&
+		record.data === thing.data
+		);
+
+	if (is_match)
+		return writeSuccess(`Data did not change.`);
+
+
+	// 3. The record did change, so time to write it to the database.
 	let response: D1Response;
 
 	if ( thing )
@@ -56,7 +96,11 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 	if ( ! response.success )
 		return writeError(500, 'database error');
 
-	// 3. Send an event to the durable object to allow clients to auto-update.
+
+	// 4. Send an event to the durable object to allow clients to auto-update.
+
+	// TODO: Potentially check KV to see if we expect to have listeners.
+
 	const id = env.WEBSOCKET_HOST.idFromName('main'),
 		stub = env.WEBSOCKET_HOST.get(id);
 
@@ -69,8 +113,9 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 			}
 		));
 
-	// 4. Return a success.
-	return writeSuccess(`Updated ${response.meta.rows_written} in ${response.meta.duration}ms`);
+
+	// 5. Return a success.
+	return writeSuccess(`Updated record in ${response.meta.duration}ms`);
 
 }
 
