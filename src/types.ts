@@ -16,14 +16,14 @@ export type PlayerAndPluginFormatV1 = {
 
 export type PluginFormatV1 = {
 	expires: string;
-	stickers: ZeroToNineString;
-	secondChancePoints: ZeroToNineString;
+	stickers: ZeroToNine;
+	secondChancePoints: ZeroToNine;
 	duties: PluginDutyStatus[];
 };
 
 export type PluginDutyStatus = {
-	id: ZeroToNineString;
-	status: `${DutyState}`;
+	id: number;
+	status: DutyState;
 };
 
 export enum DutyState {

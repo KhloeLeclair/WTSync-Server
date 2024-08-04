@@ -11,11 +11,11 @@ export function pluginToDatabase(player: string, input: PluginFormatV1): DBForma
 	if (when < Date.now())
 		return null;
 
-	let stickers = parseInt(input.stickers, 10);
+	let stickers = typeof input.stickers === 'string' ? parseInt(input.stickers, 10) : input.stickers;
 	if (Number.isNaN(stickers) || stickers < 0 || stickers > 9)
 		throw new Error('input out of range');
 
-	let points = parseInt(input.secondChancePoints, 10);
+	let points = typeof input.secondChancePoints === 'string' ? parseInt(input.secondChancePoints, 10) : input.secondChancePoints;
 	if (Number.isNaN(points) || points < 0 || points > 9)
 		throw new Error('input out of range');
 
@@ -89,7 +89,7 @@ export async function beginPartyRequest(request: Request, env: Env) {
 
 	// 1. Validation
 	const url = new URL(request.url),
-		match = /^\/party\/([\d,]+)$/i.exec(url.pathname);
+		match = /^\/party\/(.+)$/i.exec(url.pathname);
 	if (!match)
 		throw new Error('invalid ids');
 
@@ -110,9 +110,23 @@ export async function beginPartyRequest(request: Request, env: Env) {
 		throw new Error('invalid response from database');
 
 	// 3. Convert the output to the correct format.
+	const seen = new Set<string>(ids);
+
 	const results = [] as PlayerAndPluginFormatV1[];
-	for(const entry of (response as any).results)
-		results.push(databaseToPlugin(entry));
+	for(const entry of (response as any).results) {
+		const result = databaseToPlugin(entry);
+		results.push(result);
+		seen.delete(result.id);
+	}
+
+	for(const id of seen) {
+		results.push({
+			id,
+			status: null
+		});
+	}
+
+	results.sort((a, b) => a.id.localeCompare(b.id));
 
 	return {
 		ids,

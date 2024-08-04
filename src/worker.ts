@@ -42,14 +42,14 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 
 	// 1. Validation and conversion.
 	try {
-		if (typeof body?.id !== 'string' || ! /^\d+$/.test(body.id))
+		if (typeof body?.id !== 'string' || body.id.length === 0)
 			throw new Error('invalid player id');
 
-			// If there is no status, we do a delete rather than an upsert.
-			if (!body.status)
-				thing = null;
-			else
-				thing = pluginToDatabase(body.id, body.status);
+		// If there is no status, we do a delete rather than an upsert.
+		if (!body.status)
+			thing = null;
+		else
+			thing = pluginToDatabase(body.id, body.status);
 
 	} catch(err) {
 		return writeError(400, `Invalid input: ${err}`);
